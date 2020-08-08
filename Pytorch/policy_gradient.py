@@ -6,16 +6,20 @@ from torch.distributions import Categorical
 import matplotlib.pyplot as plt
 
 
-env_name = 'CartPole-v0'
+# env_name = 'CartPole-v0'
+env_name = 'LunarLander-v2'
+
 env = gym.make(env_name)
 
 obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
 
+print(obs_space)
+
+
 model = nn.Sequential(
-    nn.Linear(obs_space, 10),
-    nn.Linear(10, 10),
-    nn.Linear(10, action_space)
+    nn.Linear(obs_space, 20),
+    nn.Linear(20, action_space)
 )
 optimizer = Adam(model.parameters(), lr=0.01)
 
@@ -51,7 +55,7 @@ def calculate_returns(rewards):
     return returns
 
 
-def play_one_game(max_steps=1000):
+def play_one_game(max_steps=10000):
     s = env.reset()
 
     state_hist = []
@@ -82,7 +86,7 @@ def play_one_game(max_steps=1000):
     return state_hist, action_hist, return_hist, total_reward
 
 
-def train_one_epoch(batch_size=128):
+def train_one_epoch(batch_size=256):
 
     states = []
     actions = []
@@ -92,7 +96,7 @@ def train_one_epoch(batch_size=128):
     i = 0
 
     while len(states) < batch_size:
-        state_hist, action_hist, return_hist, total_reward = play_one_game()
+        state_hist, action_hist, return_hist, total_reward = play_one_game(max_steps=200)
         states += state_hist
         actions += action_hist
         returns += return_hist
@@ -116,9 +120,19 @@ def train(num_of_epochs=250):
 
 
 def main():
-    rewards = train()
+    rewards = train(num_of_epochs=1000)
+
     plt.plot(rewards)
     plt.show()
+
+    for _ in range(10):
+        s = env.reset()
+        while True:
+            a = get_action(torch.as_tensor(s, dtype=torch.float32))
+            s, r, done, info = env.step(a)
+            env.render()
+            if done:
+                break
 
 
 if __name__ == "__main__":
