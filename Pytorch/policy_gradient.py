@@ -6,133 +6,113 @@ from torch.distributions import Categorical
 import matplotlib.pyplot as plt
 
 
-# env_name = 'CartPole-v0'
-env_name = 'LunarLander-v2'
+env_name = 'CartPole-v0'
+# env_name = 'LunarLander-v2'
 
 env = gym.make(env_name)
 
 obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
 
-print(obs_space)
-
 
 model = nn.Sequential(
-    nn.Linear(obs_space, 20),
-    nn.Linear(20, action_space)
+    nn.Linear(obs_space, 32),
+    nn.ReLU(),
+    nn.Linear(32, action_space)
 )
 optimizer = Adam(model.parameters(), lr=0.01)
 
+discount = 0.99
 
-def get_policy(obs):
-    logits = model(obs)
+
+def get_policy(state):
+    logits = model(state)
     return Categorical(logits=logits)
 
 
-def get_action(obs):
-    return get_policy(obs).sample().item()
+def get_action(state):
+    state = torch.as_tensor(state, dtype=torch.float32)
+    return get_policy(state).sample().item()
 
 
-def compute_loss(states, actions, returns):
-    return -(get_policy(states).log_prob(actions) * returns).mean()
+def compute_loss(states, actions, rewards_to_go):
+    return -(get_policy(states).log_prob(actions) * rewards_to_go).mean()
 
 
-def policy_update(states, actions, returns):
+def policy_update(states, actions, rewards):
+    rewards_to_go = compute_r2g(rewards, discount)
     model.zero_grad()
     loss = compute_loss(
         torch.as_tensor(states, dtype=torch.float32),
         torch.as_tensor(actions, dtype=torch.int32),
-        torch.as_tensor(returns, dtype=torch.float32),
+        torch.as_tensor(rewards_to_go, dtype=torch.float32),
     )
     loss.backward()
     optimizer.step()
 
 
-def calculate_returns(rewards):
-    returns = []
-    for i in range(len(rewards)):
-        returns.append(sum(rewards[i:]))
-    return returns
+def compute_r2g(rewards, gamma):
+    """
+        Computes discounted rewards-to-go and normalizes them.
+        Params:
+            gamma - Discount.
+    """
+    rewards2go = []
+    running_sum = 0
+    for r in rewards[::-1]:
+        running_sum = r + gamma * running_sum
+        rewards2go.insert(0, running_sum)
+
+    rewards2go = torch.tensor(rewards2go)
+    rewards_normalized = (rewards2go - rewards2go.mean()) / (rewards2go.std() + 0.0001)
+    return rewards_normalized
 
 
-def play_one_game(max_steps=10000):
+def play_one_game(max_steps=10000, render=False):
     s = env.reset()
-
-    state_hist = []
-    action_hist = []
-    reward_hist = []
+    states = []
+    actions = []
+    rewards = []
 
     for _ in range(max_steps):
-        a = get_action(torch.as_tensor(s, dtype=torch.float32))
-
-        # unlock to compare with random algorithm
-        # a = env.action_space.sample()
-
+        a = get_action(s)
         new_s, r, done, info = env.step(a)
 
-        # env.render()
+        if render:
+            env.render()
 
-        state_hist.append(s)
-        action_hist.append(a)
-        reward_hist.append(r)
+        states.append(s)
+        actions.append(a)
+        rewards.append(r)
 
         if done:
             break
 
         s = new_s
 
-    total_reward = sum(reward_hist)
-    return_hist = calculate_returns(reward_hist)
-    return state_hist, action_hist, return_hist, total_reward
+    return states, actions, rewards
 
 
-def train_one_epoch(batch_size=256):
+def train(num_of_episodes=250):
+    reward_hist = []
 
-    states = []
-    actions = []
-    returns = []
+    for i in range(num_of_episodes):
 
-    mean_reward = 0
-    i = 0
+        states, actions, rewards = play_one_game()
 
-    while len(states) < batch_size:
-        state_hist, action_hist, return_hist, total_reward = play_one_game(max_steps=200)
-        states += state_hist
-        actions += action_hist
-        returns += return_hist
-        mean_reward += total_reward
-        i += 1
+        policy_update(states, actions, rewards)
 
-    mean_reward /= i
+        total_reward = sum(rewards)
+        print(f"Episode {i}, length: {len(states)} reward: {total_reward}")
+        reward_hist.append(total_reward)
 
-    policy_update(states, actions, returns)
-
-    return mean_reward
-
-
-def train(num_of_epochs=250):
-    rewards = []
-    for i in range(num_of_epochs):
-        mean_reward = train_one_epoch()
-        print(f"Epoch {i}, mean reward: {mean_reward}")
-        rewards.append(mean_reward)
-    return rewards
+    return reward_hist
 
 
 def main():
-    rewards = train(num_of_epochs=1000)
-
-    plt.plot(rewards)
+    reward_hist = train()
+    plt.plot(reward_hist)
     plt.show()
-
-    for _ in range(10):
-        s = env.reset()
-        while True:
-            a = get_action(torch.as_tensor(s, dtype=torch.float32))
-            s, r, done, info = env.step(a)
-            env.render()
-            if done:
-                break
 
 
 if __name__ == "__main__":
