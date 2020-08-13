@@ -63,8 +63,8 @@ class ActorCritic(nn.Module):
         adv = adv.detach()  # remove gradient from advantage estimations
 
         action_loss = -(log_probs * adv).mean()
-        value_loss = F.smooth_l1_loss(state_values, rewards_to_go)
         # value_loss = F.mse_loss(state_values, rewards_to_go)
+        value_loss = F.smooth_l1_loss(state_values, rewards_to_go)
 
         return action_loss + value_loss
 
@@ -95,8 +95,7 @@ def compute_r2g(rewards, gamma):
 
 
 def update():
-    discount = 0.99
-    rewards_to_go = compute_r2g(memory.rewards, gamma=discount)
+    rewards_to_go = compute_r2g(memory.rewards, gamma=0.99)
 
     rewards_to_go = torch.as_tensor(rewards_to_go, dtype=torch.float32)
     log_probs = torch.stack(memory.log_probs)  # transform list of tensors to single tensor
@@ -126,21 +125,18 @@ def play_one_game(max_steps=10000):
 
 def train(num_of_games=1000):
     reward_hist = []
-
     for i in range(num_of_games):
-
         play_one_game()
         update()
 
         total_reward = sum(memory.rewards)
         ep_length = len(memory.rewards)
+        reward_hist.append(total_reward)
 
         memory.clear()
 
         if i % 10 == 0:
             print(f"Episode {i}, length: {ep_length}, reward: {total_reward}")
-
-        reward_hist.append(total_reward)
 
     return reward_hist
 

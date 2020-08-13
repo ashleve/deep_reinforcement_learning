@@ -97,9 +97,7 @@ def train(num_of_episodes=250):
     reward_hist = []
 
     for i in range(num_of_episodes):
-
         states, actions, rewards = play_one_game()
-
         policy_update(states, actions, rewards)
 
         total_reward = sum(rewards)
