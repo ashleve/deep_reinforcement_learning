@@ -8,9 +8,7 @@ import matplotlib.pyplot as plt
 
 env_name = 'CartPole-v0'
 # env_name = 'LunarLander-v2'
-
 env = gym.make(env_name)
-
 obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
 
@@ -21,8 +19,6 @@ model = nn.Sequential(
     nn.Linear(32, action_space)
 )
 optimizer = Adam(model.parameters(), lr=0.01)
-
-discount = 0.99
 
 
 def get_policy(state):
@@ -40,7 +36,8 @@ def compute_loss(states, actions, rewards_to_go):
 
 
 def policy_update(states, actions, rewards):
-    rewards_to_go = compute_r2g(rewards, discount)
+    rewards_to_go = compute_r2g(rewards, gamma=0.99)
+
     model.zero_grad()
     loss = compute_loss(
         torch.as_tensor(states, dtype=torch.float32),
@@ -53,18 +50,21 @@ def policy_update(states, actions, rewards):
 
 def compute_r2g(rewards, gamma):
     """
-        Computes discounted rewards-to-go and normalizes them.
+        Calculates discounted rewards-to-go and normalizes them.
         Params:
             gamma - Discount.
     """
+
     rewards2go = []
     running_sum = 0
     for r in rewards[::-1]:
         running_sum = r + gamma * running_sum
         rewards2go.insert(0, running_sum)
 
+    # normalize rewards
     rewards2go = torch.tensor(rewards2go)
     rewards_normalized = (rewards2go - rewards2go.mean()) / (rewards2go.std() + 0.0001)
+
     return rewards_normalized
 
 
