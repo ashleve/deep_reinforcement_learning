@@ -12,27 +12,21 @@ env_name = 'LunarLander-v2'
 env = gym.make(env_name)
 obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
-torch.manual_seed(234)
+torch.manual_seed(123)
 
 
 class Memory:
     def __init__(self):
-        self.states = []
-        self.actions = []
         self.rewards = []
         self.log_probs = []
         self.state_values = []
 
-    def add(self, state, action, reward, log_prob, state_value):
-        self.states.append(state)
-        self.actions.append(action)
+    def add(self, reward, log_prob, state_value):
         self.rewards.append(reward)
         self.log_probs.append(log_prob)
         self.state_values.append(state_value)
 
     def clear(self):
-        self.states.clear()
-        self.actions.clear()
         self.rewards.clear()
         self.log_probs.clear()
         self.state_values.clear()
@@ -80,7 +74,6 @@ def compute_r2g(rewards, gamma):
         Params:
             gamma - Discount.
     """
-
     rewards2go = []
     running_sum = 0
     for r in rewards[::-1]:
@@ -95,7 +88,7 @@ def compute_r2g(rewards, gamma):
 
 
 def update():
-    rewards_to_go = compute_r2g(memory.rewards, gamma=0.99)
+    rewards_to_go = compute_r2g(memory.rewards, gamma=0.97)
 
     rewards_to_go = torch.as_tensor(rewards_to_go, dtype=torch.float32)
     log_probs = torch.stack(memory.log_probs)  # transform list of tensors to single tensor
@@ -115,7 +108,7 @@ def play_one_game(max_steps=10000):
 
         new_s, r, done, info = env.step(a.item())
 
-        memory.add(state=s, action=a, reward=r, log_prob=pi.log_prob(a), state_value=v)
+        memory.add(reward=r, log_prob=pi.log_prob(a), state_value=v)
 
         if done:
             break
@@ -125,6 +118,7 @@ def play_one_game(max_steps=10000):
 
 def train(num_of_games=1000):
     reward_hist = []
+
     for i in range(num_of_games):
         play_one_game()
         update()
@@ -143,6 +137,7 @@ def train(num_of_games=1000):
 
 def main():
     reward_hist = train(num_of_games=1500)
+    env.close()
 
     plt.plot(reward_hist)
     plt.show()
@@ -150,5 +145,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

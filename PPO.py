@@ -37,7 +37,7 @@ class ActorCritic(nn.Module):
 
         self.first_layer = nn.Sequential(
             nn.Linear(obs_space, 64),
-            nn.Tanh()
+            nn.ReLU()
         )
         self.action_layer = nn.Sequential(
             nn.Linear(64, action_space),
@@ -63,7 +63,6 @@ def compute_r2g(rewards, gamma):
         Params:
             gamma - Discount.
     """
-
     rewards2go = []
     running_sum = 0
     for r in rewards[::-1]:
@@ -79,6 +78,8 @@ def update():
     states = torch.as_tensor(memory.states, dtype=torch.float32)
     actions = torch.as_tensor(memory.actions, dtype=torch.int32)
     rewards = torch.as_tensor(memory.rewards, dtype=torch.float32)
+
+    # normalize rewards
     rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
     pi, v = actor_critic(states)
@@ -152,5 +153,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
