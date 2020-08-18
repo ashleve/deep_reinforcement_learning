@@ -1,4 +1,5 @@
 ## Clean, single file, minimalistic and easy to read implementations of Deep Reinforcement Learning algorithms
+These implementations are designed to be as simple as possible. No unnecessary python magic.
 
 ### Currently implemented:
 - [x] DQN ([DQN.py](https://github.com/hobogalaxy/deep_reinforcement_learning/blob/master/DQN.py))
