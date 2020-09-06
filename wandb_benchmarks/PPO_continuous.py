@@ -136,17 +136,22 @@ memory = Memory()
 
 def compute_GAE(rewards, state_values, done, gamma, lamb):
     """
-        Computes Generalized Advantage Estimations for a single trajectory.
+        Computes Generalized Advantage Estimations.
         Params:
             gamma - Discount.
     """
     returns = []
     adv = []
     running_sum = 0
-    state_values.append(0)
     for i in reversed(range(len(rewards))):
-        delta = rewards[i] + gamma * state_values[i+1] * done[i+1] - state_values[i]
-        running_sum = delta + gamma * lamb * running_sum * done[i+1]
+        if i == len(rewards) - 1:
+            next_done = memory.last_done_for_gae
+            next_state_value = critic(torch.FloatTensor(memory.last_state_for_gae)).item()
+        else:
+            next_done = done[i+1]
+            next_state_value = state_values[i+1]
+        delta = rewards[i] + gamma * next_state_value * next_done - state_values[i]
+        running_sum = delta + gamma * lamb * running_sum * next_done
         returns.insert(0, running_sum + state_values[i])
         adv.insert(0, running_sum)
 
@@ -275,6 +280,8 @@ def train(max_num_of_games=100_000, max_steps=10_000, total_max_steps=1_000_000)
         for j in range(max_steps):
 
             s = torch.FloatTensor(s.reshape(1, -1)).to(device)
+            # print(s)
+            # s = torch.FloatTensor(s)
 
             a, log_prob, pi = actor(s)
 
@@ -287,9 +294,8 @@ def train(max_num_of_games=100_000, max_steps=10_000, total_max_steps=1_000_000)
             total_number_of_steps += 1
 
             if memory.size >= config.memory_size:
-                memory.done.append(done)  # this is just to make GAE computation work
-                memory.rewards[-1] += config.gamma * critic(torch.FloatTensor(new_s).to(device)).item() * done  # bootstrap future reward
-
+                memory.last_state_for_gae = new_s
+                memory.last_done_for_gae = done
                 update()
                 memory.clear()
 
